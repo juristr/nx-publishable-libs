@@ -1,105 +1,112 @@
+# Angular Library distribution with Nx
 
+## Angular Libraries with multiple entry points
 
-# Myorg
+This is similar to how Angular Material for instance is being distributed. You have **one** publishable library (e.g. `@myorg/thelib`), but each package in there has it's own entry point. As such, developers might import things like
 
-This project was generated using [Nx](https://nx.dev).
+```typescript
+import { FooModule } from '@myorg/thelib/foo';
+import { BarModule } from '@myorg/thelib/bar';
+```
 
-<p align="center"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="450"></p>
+### Commands to reproduce
 
-🔎 **Nx is a set of Extensible Dev Tools for Monorepos.**
+Generate the library
 
-## Quick Start & Documentation
+```
+$ npx nx generate @nrwl/angular:library --name=thelib --importPath=@myorg/thelib --publishable
+```
 
-[Nx Documentation](https://nx.dev/angular)
+The library needs to be reorganized a bit in order to have multiple entry points.
 
-[10-minute video showing all Nx features](https://nx.dev/angular/getting-started/what-is-nx)
+#### Delete the main ng module
 
-[Interactive Tutorial](https://nx.dev/angular/tutorial/01-create-application)
+In our case we don't need the `libs/thelib/src/lib/thelib.module.ts` any more. We're going to expose a module per entry point.
 
-## Adding capabilities to your workspace
+#### Change the source root
 
-Nx supports many plugins which add capabilities for developing different types of applications and different tools.
+Change the `sourceRoot` from pointing to the libs `src` folder to the `root` in `angular.json`
 
-These capabilities include generating applications, libraries, etc as well as the devtools to test, and build projects as well.
+```json
+...
+"thelib": {
+  "projectType": "library",
+  "root": "libs/thelib",
+  "sourceRoot": "libs/thelib",
+  "prefix": "myorg",
+  ...
+},
+...
+```
 
-Below are our core plugins:
+The reason is that we don't want secondary entry points to live within the `src` folder, as otherwise the final production bundle import path would look like `@myorg/thelib/src/foo`.
 
-- [Angular](https://angular.io)
-  - `ng add @nrwl/angular`
-- [React](https://reactjs.org)
-  - `ng add @nrwl/react`
-- Web (no framework frontends)
-  - `ng add @nrwl/web`
-- [Nest](https://nestjs.com)
-  - `ng add @nrwl/nest`
-- [Express](https://expressjs.com)
-  - `ng add @nrwl/express`
-- [Node](https://nodejs.org)
-  - `ng add @nrwl/node`
+### Generating a new entry point component
 
-There are also many [community plugins](https://nx.dev/nx-community) you could add.
+This repo contains a Nx [workspace generator](https://nx.dev/latest/angular/workspace/workspace-generator#workspace-generator) to help generating new entry points with components that get exposed
 
-## Generate an application
+```
+$ npx nx workspace-generator thelib-component foo
+```
 
-Run `ng g @nrwl/angular:app my-app` to generate an application.
+### Building the library
 
-> You can use any of the plugins above to generate applications as well.
+Executing this command will create a publishable package.
 
-When using Nx, you can create multiple applications and libraries in the same workspace.
+```
+$ npx nx build thelib --configuration=production
+```
 
-## Generate a library
+In the `dist` folder you should see the built result which can be published to npm or whatever package registry you'd like.
 
-Run `ng g @nrwl/angular:lib my-lib` to generate a library.
+### Using the library in the demoapp within the monorepo
 
-> You can also use any of the plugins above to generate libraries as well.
+You can also reference the library directly from within your apps in the monorepo. In order to do so you can change the TS path mappings in `tsconfig.base.json` in order to account for the secondary entry points.
 
-Libraries are shareable across libraries and applications. They can be imported from `@myorg/mylib`.
+```json
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    ...
+    "paths": {
+      "@myorg/thelib/*": ["libs/thelib/*"]
+    }
+  },
+  "exclude": ["node_modules", "tmp"]
+}
+```
 
-## Development server
+After that, you should be able to reference the libs in the `demoapp/../app.module.ts`
 
-Run `ng serve my-app` for a dev server. Navigate to http://localhost:4200/. The app will automatically reload if you change any of the source files.
+```
+...
+import { TheLibFooModule } from '@myorg/thelib/foo';
+import { TheLibBarModule } from '@myorg/thelib/bar';
 
-## Code scaffolding
+@NgModule({
+  declarations: [AppComponent],
+  imports: [BrowserModule, TheLibFooModule, TheLibBarModule],
+  providers: [],
+  bootstrap: [AppComponent],
+})
+export class AppModule {}
+```
 
-Run `ng g component my-component --project=my-app` to generate a new component.
+### Consuming the production bundle
 
-## Build
+**Note,** with the previously described approach, the libraries are being consumed by webpack directly from the source. Usually that is enough and allows for a better developer experience in that you get live refresh during development. If you want to consume the libs from the production bundle, change the path mapping to
 
-Run `ng build my-app` to build the project. The build artifacts will be stored in the `dist/` directory. Use the `--prod` flag for a production build.
+```json
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    ...
+    "paths": {
+      "@myorg/thelib/*": ["dist/libs/thelib/*"]
+    }
+  },
+  "exclude": ["node_modules", "tmp"]
+}
+```
 
-## Running unit tests
-
-Run `ng test my-app` to execute the unit tests via [Jest](https://jestjs.io).
-
-Run `nx affected:test` to execute the unit tests affected by a change.
-
-## Running end-to-end tests
-
-Run `ng e2e my-app` to execute the end-to-end tests via [Cypress](https://www.cypress.io).
-
-Run `nx affected:e2e` to execute the end-to-end tests affected by a change.
-
-## Understand your workspace
-
-Run `nx dep-graph` to see a diagram of the dependencies of your projects.
-
-## Further help
-
-Visit the [Nx Documentation](https://nx.dev/angular) to learn more.
-
-
-
-
-
-
-## ☁ Nx Cloud
-
-### Computation Memoization in the Cloud
-
-<p align="center"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-cloud-card.png"></p>
-
-Nx Cloud pairs with Nx in order to enable you to build and test code more rapidly, by up to 10 times. Even teams that are new to Nx can connect to Nx Cloud and start saving time instantly.
-
-Teams using Nx gain the advantage of building full-stack applications with their preferred framework alongside Nx’s advanced code generation and project dependency graph, plus a unified experience for both frontend and backend developers.
-
-Visit [Nx Cloud](https://nx.app/) to learn more.
+That requires rebuild of the library on every change. (Passing `--watch` on the building of the library doesn't seem to work due to Ivy ngcc compilation erroring).

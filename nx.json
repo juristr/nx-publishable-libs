@@ -17,6 +17,7 @@
   },
   "projects": {
     "demoapp": { "tags": [] },
-    "demoapp-e2e": { "tags": [], "implicitDependencies": ["demoapp"] }
+    "demoapp-e2e": { "tags": [], "implicitDependencies": ["demoapp"] },
+    "thelib": { "tags": [] }
   }
 }
